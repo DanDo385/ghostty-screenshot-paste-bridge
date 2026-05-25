@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: bash -n install.sh uninstall.sh bin/clipimgpath.bash
+      - name: Swift compile
+        run: swiftc -framework AppKit src/clipimgpath.swift -o /tmp/clipimgpath
+      - name: Lua syntax
+        run: luac -p hammerspoon/ghostty-screenshot-paste-bridge.lua
