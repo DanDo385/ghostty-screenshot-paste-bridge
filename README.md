@@ -82,7 +82,7 @@ This removes:
 
 The primary converter is `src/clipimgpath.swift`. It reads `NSPasteboard.general`, converts image clipboard data to PNG using AppKit, writes the result under the macOS temp directory, copies the shell-escaped path back to the pasteboard, and prints it.
 
-`bin/clipimgpath.bash` is a fallback for machines without `swiftc`.
+`bin/clipimgpath.bash` is a fallback for machines without `swiftc`. See `docs/upstream-ghostty.md` for notes on how the Swift helper maps to a possible native Ghostty patch.
 
 Hammerspoon is only used for the Ghostty-specific `Cmd+V` interception because Ghostty itself does not currently expose a built-in hook for “before paste, convert image clipboard to path.”
 
