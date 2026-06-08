@@ -51,7 +51,7 @@ patch_hammerspoon_init() {
   mkdir -p "$HS_DIR"
   touch "$HS_INIT"
 
-  if grep -Fq "$BEGIN_MARKER" "$HS_INIT"; then
+  if grep -Fq -- "$BEGIN_MARKER" "$HS_INIT"; then
     perl -0pi -e "s|\Q$BEGIN_MARKER\E.*?\Q$END_MARKER\E|$BEGIN_MARKER\nrequire(\"ghostty-screenshot-paste-bridge\")\n$END_MARKER|s" "$HS_INIT"
   else
     {
