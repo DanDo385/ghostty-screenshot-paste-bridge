@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Pull an image-only macOS clipboard from the GUI-owning Mac to this Mac.
+# No Hammerspoon. No Accessibility. Uses SSH + the existing Swift/AppKit clipimgpath helper.
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+clipshot-sync [--host HOST] [--dest DIR] [--copy-remote] [--osc52] [--plain]
+
+Pulls the GUI Mac's clipboard image into a local PNG and prints the local path.
+
+Options:
+  --host HOST       GUI-owning Mac reachable by SSH. Default: ${CLIPSHOT_GUI_HOST:-imac-cockpit}
+  --dest DIR        Local destination directory. Default: ${CLIPSHOT_DEST:-$HOME/.cache/hermes/clipshots}
+  --copy-remote     After transfer, copy the local path back to the GUI Mac clipboard via pbcopy.
+  --osc52           Emit OSC 52 to ask the terminal to copy the local path to the GUI clipboard.
+  --plain           Print raw local path instead of shell-escaped path.
+  -h, --help        Show this help.
+
+Typical flow:
+  1. On the iMac, copy a screenshot to clipboard with Ctrl-Cmd-Shift-4.
+  2. In the MBP SSH shell shown inside Ghostty, run: clipshot-sync --copy-remote
+  3. Press Cmd-V. The pasted path is valid on the MBP.
+USAGE
+}
+
+shell_escape() {
+  local s=$1
+  printf "'%s'" "${s//\'/\'\\\'\'}"
+}
+
+osc52_copy() {
+  local text=$1
+  # OSC 52 clipboard write: ESC ] 52 ; c ; base64(text) BEL
+  local encoded
+  encoded="$(printf '%s' "$text" | /usr/bin/base64 | tr -d '\n')"
+  printf '\033]52;c;%s\a' "$encoded"
+}
+
+host="${CLIPSHOT_GUI_HOST:-imac-cockpit}"
+dest="${CLIPSHOT_DEST:-$HOME/.cache/hermes/clipshots}"
+copy_remote=0
+osc52=0
+plain=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host) host="${2:?missing host}"; shift 2 ;;
+    --dest) dest="${2:?missing dest}"; shift 2 ;;
+    --copy-remote) copy_remote=1; shift ;;
+    --osc52) osc52=1; shift ;;
+    --plain) plain=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "clipshot-sync: unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+mkdir -p "$dest"
+
+remote_path="$({
+  ssh -o BatchMode=yes "$host" '\
+    if command -v clipimgpath >/dev/null 2>&1; then \
+      clipimgpath --plain; \
+    elif [ -x "$HOME/.local/bin/clipimgpath" ]; then \
+      "$HOME/.local/bin/clipimgpath" --plain; \
+    else \
+      echo "clipshot-sync: remote clipimgpath not found" >&2; exit 127; \
+    fi'
+} | tail -n 1)"
+
+if [[ -z "$remote_path" ]]; then
+  echo "clipshot-sync: remote helper returned an empty path" >&2
+  exit 1
+fi
+
+stamp="$(date '+%Y-%m-%d_%H.%M.%S')"
+local_path="$dest/Screenshot $stamp.png"
+remote_q="$(printf '%q' "$remote_path")"
+
+ssh -o BatchMode=yes "$host" "/bin/cat $remote_q" > "$local_path"
+
+if [[ ! -s "$local_path" ]]; then
+  rm -f "$local_path"
+  echo "clipshot-sync: transfer produced an empty file" >&2
+  exit 1
+fi
+
+paste_path="$local_path"
+if [[ "$plain" -eq 0 ]]; then
+  paste_path="$(shell_escape "$local_path")"
+fi
+
+if [[ "$copy_remote" -eq 1 ]]; then
+  printf '%s' "$paste_path" | ssh -o BatchMode=yes "$host" /usr/bin/pbcopy
+fi
+
+if [[ "$osc52" -eq 1 ]]; then
+  osc52_copy "$paste_path"
+fi
+
+printf '%s\n' "$paste_path"

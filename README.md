@@ -88,7 +88,7 @@ Hammerspoon is only used for the Ghostty-specific `Cmd+V` interception because G
 
 ## Manual use
 
-You can also run the converter directly:
+You can also run the converter directly on the GUI-owning Mac:
 
 ```sh
 clipimgpath
@@ -99,6 +99,22 @@ Or print/copy the raw unescaped path:
 ```sh
 clipimgpath --plain
 ```
+
+## No-Hammerspoon SSH pull mode
+
+For SSH workflows, the GUI Mac's temp path is not enough. If Ghostty runs on an iMac but the shell/Hermes runtime is on an MBP, the MBP needs its own local copy of the image.
+
+`bin/clipshot-sync` runs from the MBP, pulls the current iMac clipboard image over SSH, saves it as a MBP-local PNG, and optionally copies that MBP path back to the iMac clipboard:
+
+```sh
+bin/clipshot-sync --host imac-cockpit --copy-remote
+```
+
+Then press `Cmd+V` in Ghostty. The pasted path is readable by the MBP-hosted shell or agent.
+
+This mode does not use Hammerspoon or Accessibility permissions. It requires SSH from the MBP to the GUI-owning Mac and `clipimgpath` installed on that GUI Mac.
+
+See `docs/no-hammerspoon-ssh-pull.md`.
 
 ## Related Ghostty upstream work
 
